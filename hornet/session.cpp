@@ -28,18 +28,30 @@ constexpr uint32_t SHM = 0x3F200000, SHM_SIZE = 0x2000;
 constexpr uint32_t OFF_MAGIC = 0x00, OFF_ROMS = 0x08, OFF_COUNT = 0x10, OFF_BEAT = 0x18, OFF_STATE = 0x20,
                    OFF_STATUS = 0x40, OFF_RING = 0x1000;
 constexpr uint32_t RING = 512;
-constexpr uint32_t PROG_BYTES = 0x80000, SMP_BYTES = 0x800000;
+constexpr uint32_t PROG_BYTES = 0x80000;
 constexpr s64 TICKS_PER_MS = hornet_board::CPU_HZ / 1000;
 constexpr s64 LAT = 2 * TICKS_PER_MS;             // an entry's delay past its stamp
-const char *const SETS[] = {"gradius4", "gradius4u", "gradius4a", "gradius4ja", "gradius4ua", "gradius4aa"};
+// the sets, and the size of their sample region (the RF5C400's reads wrap at it)
+struct set_info { const char *name; uint32_t samples; };
+const set_info SETS[] = {
+	{"gradius4", 0x800000}, {"gradius4u", 0x800000}, {"gradius4a", 0x800000}, {"gradius4ja", 0x800000},
+	{"gradius4ua", 0x800000}, {"gradius4aa", 0x800000},
+	{"nbapbp", 0x1000000}, {"nbapbpa", 0x1000000}, {"nbapbpj", 0x1000000}, {"nbapbpua", 0x1000000},
+	{"nbapbpaa", 0x1000000}, {"nbapbpja", 0x1000000}, {"nbaatw", 0x1000000}, {"nbaatwa", 0x1000000},
+};
+
+uint32_t sample_bytes(const char *name)
+{
+	for (const set_info &s : SETS)
+		if (!strcmp(name, s.name)) return s.samples;
+	return 0;
+}
 
 }  // namespace
 
 bool hornet_claims(const char *name)
 {
-	for (const char *s : SETS)
-		if (!strcmp(name, s)) return true;
-	return false;
+	return sample_bytes(name) != 0;
 }
 
 // runs until the core changes or the process is stopped; mem is /dev/mem
@@ -62,6 +74,7 @@ void hornet_run(int mem, bool verbose)
 	s64 offset = 0, last_tick = 0;
 	uint32_t last_us = 0;
 	core_name cname = read_core_name();
+	const uint32_t SMP_BYTES = sample_bytes(cname.name.c_str());
 	int64_t name_t = now_ns();
 	int64_t rep_t = now_ns(), busy_ns = 0, rep_cpu = cpu_ns();
 	uint32_t rep_entries = 0;
