@@ -6,16 +6,7 @@
 #include <cstdarg>
 #include <cstdlib>
 
-static bool s_log = std::getenv("HNG64SND_LOG") != nullptr;
-
-void logerror(const char *fmt, ...)
-{
-	if (!s_log) return;
-	va_list ap;
-	va_start(ap, fmt);
-	std::vfprintf(stderr, fmt, ap);
-	va_end(ap);
-}
+// logerror: common/logerror.cpp (arcsnd)
 
 #define COMBINE_DATA(varptr) (*(varptr) = (*(varptr) & ~mem_mask) | (data & mem_mask))
 

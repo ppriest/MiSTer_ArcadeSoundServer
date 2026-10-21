@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// hng64snd: the hng64 sound board on the MiSTer's ARM (docs/ROADMAP.md Phase 4).
+// The hng64 sound board's session in arcsnd (server.cpp): hng64snd's mister.cpp (HyperNG64,
+// docs/ROADMAP.md Phase 4), its process-wide parts (signals, the lock, priority, /dev/mem) moved to
+// server.cpp; it returns when the core is no longer an HNG64 set.
 //
-// Started by games/<set>/_handler.sh while an HNG64 set is loaded. It shares a block of DDR3 with
+// It runs while an HNG64 set is loaded. It shares a block of DDR3 with
 // the core's hng64_sndbridge (rtl/hng64_sndbridge.sv has the layout): the main CPU's latches,
 // interrupt-5 writes and sound CPU enables come in, the sound CPU's two latches and a heartbeat go
 // out. At each enable it copies sound RAM and the sample ROM from DDR3 and starts the V53A, at
@@ -29,6 +31,7 @@
 #include <vector>
 
 #include "board.h"
+#include "daemon.h"
 
 namespace {
 
@@ -48,9 +51,6 @@ constexpr int OUT_RATE = 48000;
 constexpr double LEAD_FRAMES = OUT_RATE * 0.080;
 constexpr double PLAY_PER_NS = OUT_RATE * 1.0002 / 1e9;
 const char *const SETS[] = {"sams64", "sams64_2", "fatfurwa", "buriki", "roadedge", "xrally", "bbust2"};
-
-volatile sig_atomic_t g_stop = 0;
-void on_signal(int) { g_stop = 1; }
 
 int64_t cpu_ns()
 {
@@ -156,66 +156,18 @@ struct resampler
 
 }  // namespace
 
-int main(int argc, char **argv)
+bool hng64_claims(const char *name)
 {
-	signal(SIGTERM, on_signal);
-	signal(SIGINT, on_signal);
+	for (const char *s : SETS)
+		if (!strcmp(name, s)) return true;
+	return false;
+}
 
-	const int mem = open("/dev/mem", O_RDWR | O_SYNC);
-	if (mem < 0) { perror("/dev/mem"); return 1; }
+void hng64_run(int mem, bool verbose)
+{
 	void *p = mmap(nullptr, SHM_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, mem, DDR3_BASE + SHM);
-	if (p == MAP_FAILED) { perror("mmap"); return 1; }
+	if (p == MAP_FAILED) { perror("mmap"); return; }
 	shared sh{static_cast<volatile uint32_t *>(p)};
-
-	// -watch <seconds>: print the FPGA's words as they change, touching nothing
-	if (argc > 2 && !strcmp(argv[1], "-watch"))
-	{
-		const int64_t end = now_ns() + int64_t(atoi(argv[2])) * 1'000'000'000;
-		uint64_t last[4] = {~0ull, ~0ull, ~0ull, ~0ull};
-		const uint32_t offs[4] = {0, OFF_MBOX, OFF_RUN, OFF_STATUS};
-		const int64_t t0 = now_ns();
-		while (now_ns() < end)
-		{
-			for (int i = 0; i < 4; i++)
-			{
-				const uint64_t v = sh.read64(offs[i]);
-				if (v != last[i] && (i != 3 || (v & 0xffffffffffffull) != (last[i] & 0xffffffffffffull)))
-					printf("%8.3f s  +%02x  %016llx\n", (now_ns() - t0) / 1e9, offs[i], (unsigned long long)v);
-				last[i] = v;
-			}
-			sleep_ns(200'000);
-		}
-		return 0;
-	}
-
-	// -dump <file>: the shared block as it stands, for a look from the host
-	if (argc > 2 && !strcmp(argv[1], "-dump"))
-	{
-		std::vector<uint8_t> b(SHM_SIZE);
-		copy_in(b.data(), sh.bytes(0), SHM_SIZE);
-		FILE *f = fopen(argv[2], "wb");
-		if (!f) { perror(argv[2]); return 1; }
-		fwrite(b.data(), 1, b.size(), f);
-		fclose(f);
-		return 0;
-	}
-
-	// one copy: two writing /dev/MrAudio interleave
-	const int lock = open("/tmp/hng64snd.lock", O_RDWR | O_CREAT, 0644);
-	if (lock < 0 || flock(lock, LOCK_EX | LOCK_NB) != 0)
-	{
-		fprintf(stderr, "hng64snd: another copy is running\n");
-		return 1;
-	}
-
-	// ahead of the daemons, not of the system: a real-time priority, once the process fell
-	// behind, starved Main_MiSTer and sshd. Core 0: Main_MiSTer's main thread is pinned to core 1
-	// and takes most of it.
-	if (setpriority(PRIO_PROCESS, 0, -10) != 0) perror("setpriority");
-	cpu_set_t cpus;
-	CPU_ZERO(&cpus);
-	CPU_SET(0, &cpus);
-	if (sched_setaffinity(0, sizeof cpus, &cpus) != 0) perror("sched_setaffinity");
 
 	// Held only while a set's sound runs, so the process can stay resident (README, Sound) in
 	// under 1 MB: the sample ROM's copy, the board, and the audio device, which never waits (what it
@@ -246,7 +198,6 @@ int main(int argc, char **argv)
 	uint32_t rep_irqs = 0, rep_gaps = 0;
 	double rep_sq_l = 0, rep_sq_r = 0;
 	uint64_t rep_frames = 0;
-	const bool verbose = argc > 1 && !strcmp(argv[1], "-v");
 
 	// the model's level after what alsa.sv has played since it was last taken; an empty buffer
 	// while the sound CPU runs is a gap
@@ -302,12 +253,13 @@ int main(int argc, char **argv)
 		sh.write32(OFF_STATUS + 4, uint32_t(heartbeat++) << 16 | 0xA500u | (running ? 1u : 0u));
 	};
 
-	while (!g_stop)
+	while (!arcsnd::g_stop)
 	{
 		if (now_ns() - name_t >= 250'000'000)
 		{
 			name_t = now_ns();
 			const core_name c = read_core_name();
+			if (!c.ours) break;
 			if (c.written != cname.written || c.ours != cname.ours)
 			{
 				stop("a core was loaded");
@@ -396,7 +348,7 @@ int main(int argc, char **argv)
 			// the buffer filled to LEAD, a millisecond at a time with the mailbox between; the
 			// loop sleeps at least every 20 ms
 			const int64_t loop_end = now_ns() + 20'000'000;
-			while (level + outq.size() / 2 < LEAD_FRAMES && !g_stop && now_ns() < loop_end)
+			while (level + outq.size() / 2 < LEAD_FRAMES && !arcsnd::g_stop && now_ns() < loop_end)
 			{
 				const uint64_t mb = sh.read64(OFF_MBOX);
 				const uint16_t a0 = mb, a1 = mb >> 16, ai = mb >> 32;
@@ -453,7 +405,7 @@ int main(int argc, char **argv)
 		if (!running || level + outq.size() / 2 >= LEAD_FRAMES) sleep_ns(1'000'000);
 	}
 
-	stop("stopped");
+	stop("the core changed");
 	publish();
-	return 0;
+	munmap(p, SHM_SIZE);
 }
