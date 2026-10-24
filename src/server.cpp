@@ -4,8 +4,10 @@
 // (arcsnd.sh); it watches /tmp/CORENAME and runs the session of the board the loaded set has,
 // each against its core's shared block in DDR3, until the core changes:
 //
-//   hornet  Konami Hornet (Gradius IV): hornet/session.cpp, rtl/mister/hornet_sndbridge.sv
-//   hng64   SNK Hyper NeoGeo 64: hng64/session.cpp, HyperNG64's rtl/hng64_sndbridge.sv
+//   hornet  Konami Hornet (Gradius IV): hornet/session.cpp, Arcade-KonamiHornet_MiSTer's
+//           rtl/mister/hornet_sndbridge.sv
+//   hng64   SNK Hyper NeoGeo 64: hng64/session.cpp, Arcade-HyperNG64_MiSTer's rtl/hng64_sndbridge.sv
+// (docs/PROTOCOL.md)
 //
 //   arcsnd [-v]    -v: a line every 5 s on stderr
 

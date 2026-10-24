@@ -4,7 +4,7 @@ CC       ?= gcc
 CXX      ?= g++
 CFLAGS   ?= -O2
 CXXFLAGS ?= -std=c++17 -O2 -Wall -Wno-sign-compare
-OUT      ?= ../../obj_arcsnd
+OUT      ?= ../obj
 
 MUSASHI = hornet/musashi/m68kcpu.c hornet/musashi/m68kops.c hornet/musashi/m68kdasm.c hornet/musashi/softfloat/softfloat.c
 MUSASHI_O = $(patsubst %.c,$(OUT)/%.o,$(notdir $(MUSASHI)))
