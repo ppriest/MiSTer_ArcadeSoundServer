@@ -160,7 +160,12 @@ def main():
                 zi.external_attr = 0o100755 << 16
                 zi.compress_type = zipfile.ZIP_DEFLATED
                 z.writestr(zi, data)
-        print(f"-> {out}")
+                # ... and the same files unpacked under releases/ in the SD card's layout, for a
+                # downloader database to fetch one by one
+                f = REPO / "releases" / zi.filename
+                f.parent.mkdir(parents=True, exist_ok=True)
+                f.write_bytes(data)
+        print(f"-> {out} and releases/{REMOTE_DIR.removeprefix('/media/fat/')}, releases/{REMOTE_START.removeprefix('/media/fat/')}")
     if a.no_install:
         print(f"-> {binary}")
         return 0
