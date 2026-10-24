@@ -36,7 +36,7 @@ REMOTE_DIR = "/media/fat/games/arcsnd"
 REMOTE_START = "/media/fat/Scripts/arcsnd.sh"
 
 HANDLER = """#!/bin/sh
-# Hornet sound: the sound board on the ARM (MiSTer_HybridSoundServer). MiSTer Frontier's Master_Daemon.sh runs
+# Hornet sound: the sound board on the ARM (MiSTer_ArcadeSoundServer). MiSTer Frontier's Master_Daemon.sh runs
 # this while the set is loaded and kills it when the core changes.
 cd {dir} || exit 1
 chmod +x arcsnd
