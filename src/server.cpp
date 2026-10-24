@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // arcsnd: arcade sound boards on the MiSTer's ARM, for cores that leave their sound board to the
 // HPS (PROVENANCE.md). One copy runs, in the background, from the Scripts menu or at boot
-// (arcsnd.sh); it watches /tmp/CORENAME and runs the session of the board the loaded set has,
+// (Scripts/arcade_hybridsoundserver.sh); it watches /tmp/CORENAME and runs the session of the board the loaded set has,
 // each against its core's shared block in DDR3, until the core changes:
 //
 //   hornet  Konami Hornet (Gradius IV): hornet/session.cpp, Arcade-KonamiHornet_MiSTer's

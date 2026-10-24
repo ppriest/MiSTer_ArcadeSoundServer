@@ -5,7 +5,7 @@
     python scripts/deploy.py [--no-install] [--package]
 
 Cross-compiles with WSL's arm-linux-gnueabihf-gcc/g++ (static). Installs
-/media/fat/games/arcsnd/arcsnd; Scripts/arcsnd.sh, which starts or stops it from the Scripts menu
+/media/fat/games/arcsnd/arcsnd; Scripts/arcade_hybridsoundserver.sh, which starts or stops it from the Scripts menu
 (`start` at boot from linux/user-startup.sh); and, per Hornet set, games/<set>/_handler.sh, which
 MiSTer Frontier's Master_Daemon.sh runs while that set is loaded (/tmp/CORENAME is the .mra's
 setname). --package writes releases/arcsnd_<YYYYMMDD>.zip, the files where they go under
@@ -33,7 +33,7 @@ CXX_SRC = ["server.cpp", "common/daemon.cpp", "common/logerror.cpp",
 SETS = ["gradius4", "gradius4u", "gradius4a", "gradius4ja", "gradius4ua", "gradius4aa",
         "nbapbp", "nbapbpa", "nbapbpj", "nbapbpua", "nbapbpaa", "nbapbpja", "nbaatw", "nbaatwa"]
 REMOTE_DIR = "/media/fat/games/arcsnd"
-REMOTE_START = "/media/fat/Scripts/arcsnd.sh"
+REMOTE_START = "/media/fat/Scripts/arcade_hybridsoundserver.sh"
 
 HANDLER = """#!/bin/sh
 # Hornet sound: the sound board on the ARM (MiSTer_ArcadeSoundServer). MiSTer Frontier's Master_Daemon.sh runs
@@ -149,7 +149,7 @@ def main():
     OBJ.mkdir(parents=True, exist_ok=True)
     binary = OBJ / "arcsnd"
     build(binary)
-    start = OBJ / "arcsnd.sh"
+    start = OBJ / Path(REMOTE_START).name
     start.write_bytes(START.format(dir=REMOTE_DIR).encode())
     if a.package:
         out = REPO / "releases" / f"arcsnd_{time.strftime('%Y%m%d')}.zip"
@@ -165,7 +165,7 @@ def main():
                 f = REPO / "releases" / zi.filename
                 f.parent.mkdir(parents=True, exist_ok=True)
                 f.write_bytes(data)
-        print(f"-> {out} and releases/{REMOTE_DIR.removeprefix('/media/fat/')}, releases/{REMOTE_START.removeprefix('/media/fat/')}")
+        print(f"-> {out} and releases/{REMOTE_DIR.removeprefix('/media/fat/')}/arcsnd, releases/{REMOTE_START.removeprefix('/media/fat/')}")
     if a.no_install:
         print(f"-> {binary}")
         return 0
