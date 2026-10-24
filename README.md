@@ -18,7 +18,9 @@ the game is silent.
 
 * Unzip the latest `releases/arcsnd_<YYYYMMDD>.zip` onto the SD card's root. It holds
   `games/arcsnd/arcsnd` and `Scripts/arcade_hybridsoundserver.sh`.
+
 OR
+
 * Install the DB for downloader from https://github.com/ppriest/MiSTer_ppriest
 
   
