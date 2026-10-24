@@ -1,4 +1,4 @@
-# MiSTer Hybrid Sound Server
+# MiSTer Arcade Sound Server
 
 `arcsnd`: one process on the MiSTer's ARM (the HPS) that runs the sound boards of arcade cores too
 large to keep their sound CPU in the FPGA. The core passes its main CPU's writes to the sound
