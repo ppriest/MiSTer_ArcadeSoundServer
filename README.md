@@ -21,8 +21,8 @@ the game is silent.
 * Run `arcade_hybridsoundserver` from the Scripts menu (again to stop it), or add
   `/media/fat/Scripts/arcade_hybridsoundserver.sh start` to `linux/user-startup.sh` to start it at
   boot. It waits in the background, plays whenever a set it knows is loaded, and goes quiet at every core load.
-* Its log is `/tmp/arcsnd.log`: the build it is (a commit) and, with `-v`, each startup step,
-  each core name and a status line every 5 s. A crash writes the signal, the faulting address and
+* Its log is `/tmp/arcsnd.log`: the build it is (a commit), each startup step and each core name,
+  and with `-v` a status line every 5 s. A crash writes the signal, the faulting address and
   the code addresses on the stack there, for `addr2line -f -e obj/arm/builds/arcsnd_<commit>`.
 
 ## Building
