@@ -243,7 +243,7 @@ void hng64_run(int mem, bool verbose)
 		fade();
 		if (audio >= 0) close(audio);
 		audio = -1;
-		if (verbose) fprintf(stderr, "hng64snd: %s\n", why);
+		fprintf(stderr, "hng64snd: %s\n", why);
 	};
 
 	auto publish = [&] {
@@ -338,7 +338,7 @@ void hng64_run(int mem, bool verbose)
 			last_irq = irq;
 			main0 = main1 = 0;
 			rs = resampler{};
-			if (verbose) fprintf(stderr, "hng64snd: sound CPU started (enable %u, samples %u bytes at %08x)\n",
+			fprintf(stderr, "hng64snd: sound CPU started (enable %u, samples %u bytes at %08x)\n",
 				en, smp_size, smp_base);
 		}
 

@@ -93,7 +93,7 @@ void hornet_run(int mem, bool verbose)
 		std::vector<u8>().swap(samples);
 		audio.fade();
 		audio.close_dev();
-		if (verbose) fprintf(stderr, "arcsnd hornet: %s\n", why);
+		fprintf(stderr, "arcsnd hornet: %s\n", why);
 	};
 	auto apply = [&](uint64_t e) {
 		const int reg = int((e >> 32) & 0xf);
@@ -153,8 +153,8 @@ void hornet_run(int mem, bool verbose)
 			rs = resampler{};
 			audio.open_dev();
 			running = true;
-			if (verbose) fprintf(stderr, "arcsnd hornet: started (program at %08x, samples at %08x, SNDRES %d)\n",
-			                     pa, sa, int((st >> 32) & 1));
+			fprintf(stderr, "arcsnd hornet: started (program at %08x, samples at %08x, SNDRES %d)\n",
+			        pa, sa, int((st >> 32) & 1));
 		}
 
 		audio.drain(running);

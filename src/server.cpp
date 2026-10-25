@@ -9,8 +9,10 @@
 //   hng64   SNK Hyper NeoGeo 64: hng64/session.cpp, Arcade-HyperNG64_MiSTer's rtl/hng64_sndbridge.sv
 // (docs/PROTOCOL.md)
 //
-//   arcsnd [-v] [-crash]   on stderr always: the build, each startup step, each core name
-//                          -v: a line every 5 s as well
+//   arcsnd [-v] [-crash]   on stderr always: the build, each startup step, each core name, each
+//                          board's start and stop
+//                          -v: a status line every 5 s as well (the scripts leave it out: it grows
+//                          /tmp/arcsnd.log for as long as a board plays)
 //                          -crash: crash after starting up, to check the crash report
 
 #include <fcntl.h>

@@ -42,7 +42,7 @@ HANDLER = """#!/bin/sh
 # this while the set is loaded and kills it when the core changes.
 cd {dir} || exit 1
 chmod +x arcsnd
-exec ./arcsnd -v 2>/tmp/arcsnd.log
+exec ./arcsnd 2>/tmp/arcsnd.log
 """
 
 START = """#!/bin/sh
@@ -54,7 +54,7 @@ START = """#!/bin/sh
 DIR={dir}
 LOG=/tmp/arcsnd.log
 running() {{ pidof arcsnd >/dev/null; }}
-launch() {{ cd "$DIR" || exit 1; chmod +x arcsnd; setsid ./arcsnd -v </dev/null >/dev/null 2>"$LOG" & }}
+launch() {{ cd "$DIR" || exit 1; chmod +x arcsnd; setsid ./arcsnd </dev/null >/dev/null 2>"$LOG" & }}
 halt() {{ kill $(pidof arcsnd); sleep 1; if running; then echo "arcsnd did not stop"; exit 1; fi; echo "arcsnd stopped"; }}
 case "$1" in
 start) running || launch ;;
