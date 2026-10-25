@@ -23,8 +23,9 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parent.parent
 SRC = REPO / "src"
 OBJ = REPO / "obj" / "arm"
-# unwind tables in the C as well: the crash report (common/daemon.cpp) walks the stack with them
-ARCH = "-O3 -marm -mcpu=cortex-a9 -mfpu=neon -mfloat-abi=hard -funwind-tables"
+# unwind tables in the C as well, and line tables: the crash report (common/daemon.cpp) walks the
+# stack with the first, addr2line resolves it with the second
+ARCH = "-O3 -g -marm -mcpu=cortex-a9 -mfpu=neon -mfloat-abi=hard -funwind-tables"
 CXX = f"-std=c++17 {ARCH} -Wall -Wno-sign-compare -Icommon"
 C_SRC = ["hornet/musashi/m68kcpu.c", "hornet/musashi/m68kops.c", "hornet/musashi/m68kdasm.c",
          "hornet/musashi/softfloat/softfloat.c"]
@@ -128,7 +129,8 @@ def build_id():
 
 def build(out):
     o = wsl_path(OBJ)
-    (OBJ / "arcsnd_build.h").write_text(f'#define ARCSND_BUILD "{build_id()}"\n')
+    bid = build_id()
+    (OBJ / "arcsnd_build.h").write_text(f'#define ARCSND_BUILD "{bid}"\n')
     cmds = [f"cd {wsl_path(SRC)}", f"mkdir -p {o}"]
     objs = []
     for s in C_SRC:
@@ -141,6 +143,9 @@ def build(out):
         objs.append(obj)
     cmds.append(f"arm-linux-gnueabihf-g++ {ARCH} -static -o {wsl_path(out)} " + " ".join(objs))
     wsl(cmds)
+    # each build kept by its commit: a crash report from that build is resolved against it
+    (OBJ / "builds").mkdir(exist_ok=True)
+    shutil.copyfile(out, OBJ / "builds" / f"arcsnd_{bid}")
 
 
 def put(m, local, remote):
