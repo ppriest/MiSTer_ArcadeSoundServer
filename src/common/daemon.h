@@ -13,6 +13,9 @@ namespace arcsnd {
 
 extern volatile sig_atomic_t g_stop;
 
+// the commit this binary was built from (scripts/deploy.py writes arcsnd_build.h)
+extern const char *const BUILD;
+
 int64_t now_ns();
 int64_t cpu_ns();
 void sleep_ns(int64_t ns);

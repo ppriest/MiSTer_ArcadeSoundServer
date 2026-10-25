@@ -9,7 +9,8 @@
 //   hng64   SNK Hyper NeoGeo 64: hng64/session.cpp, Arcade-HyperNG64_MiSTer's rtl/hng64_sndbridge.sv
 // (docs/PROTOCOL.md)
 //
-//   arcsnd [-v]    -v: a line every 5 s on stderr
+//   arcsnd [-v] [-crash]   -v: each startup step, each core name, and a line every 5 s, on stderr
+//                          -crash: crash after starting up, to check the crash report
 
 #include <fcntl.h>
 #include <sched.h>
@@ -19,6 +20,7 @@
 
 #include <cstdio>
 #include <cstring>
+#include <string>
 
 #include "daemon.h"
 
@@ -35,10 +37,16 @@ int main(int argc, char **argv)
 {
 	signal(SIGTERM, on_signal);
 	signal(SIGINT, on_signal);
-	const bool verbose = argc > 1 && !strcmp(argv[1], "-v");
+	bool verbose = false, crash = false;
+	for (int i = 1; i < argc; i++)
+	{
+		if (!strcmp(argv[i], "-v")) verbose = true;
+		else if (!strcmp(argv[i], "-crash")) crash = true;
+	}
 
 	const int mem = open("/dev/mem", O_RDWR | O_SYNC);
 	if (mem < 0) { perror("/dev/mem"); return 1; }
+	if (verbose) fprintf(stderr, "arcsnd: /dev/mem open\n");
 
 	// one copy: two writing /dev/MrAudio interleave
 	const int lock = open("/tmp/arcsnd.lock", O_RDWR | O_CREAT, 0644);
@@ -47,6 +55,7 @@ int main(int argc, char **argv)
 		fprintf(stderr, "arcsnd: another copy is running\n");
 		return 1;
 	}
+	if (verbose) fprintf(stderr, "arcsnd: the only copy\n");
 
 	// ahead of the daemons, not of the system: a real-time priority, once the process fell behind,
 	// starved Main_MiSTer and sshd (HyperNG64, LESSONS_LEARNED). Core 0: Main_MiSTer's main thread
@@ -56,10 +65,15 @@ int main(int argc, char **argv)
 	CPU_ZERO(&cpus);
 	CPU_SET(0, &cpus);
 	if (sched_setaffinity(0, sizeof cpus, &cpus) != 0) perror("sched_setaffinity");
+	if (verbose) fprintf(stderr, "arcsnd: priority and CPU set\n");
+	if (crash) *static_cast<volatile int *>(nullptr) = 0;
 
+	std::string last = "(none)";
 	while (!arcsnd::g_stop)
 	{
 		const arcsnd::core_name c = arcsnd::read_core_name();
+		if (verbose && c.name != last) fprintf(stderr, "arcsnd: core \"%s\"\n", c.name.c_str());
+		last = c.name;
 		if (hornet_claims(c.name.c_str()))
 		{
 			if (verbose) fprintf(stderr, "arcsnd: %s, the Hornet board\n", c.name.c_str());

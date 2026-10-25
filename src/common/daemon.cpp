@@ -3,19 +3,91 @@
 
 #include "daemon.h"
 
+#include <execinfo.h>
 #include <fcntl.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <time.h>
+#include <ucontext.h>
 #include <unistd.h>
 
 #include <algorithm>
 #include <cstdio>
 #include <cstring>
 
+#if __has_include("arcsnd_build.h")
+#include "arcsnd_build.h"
+#else
+#define ARCSND_BUILD "unknown"
+#endif
+
+extern "C" char __executable_start, etext;     // the linker's: the static binary's code
+
 namespace arcsnd {
 
 volatile sig_atomic_t g_stop = 0;
+const char *const BUILD = ARCSND_BUILD;
+
+namespace {
+
+// A crash's report on stderr (/tmp/arcsnd.log from the start script): the signal, the faulting
+// address, pc, lr and sp, the unwinder's return addresses, and the words on the stack that point
+// into the code, for `addr2line -f -e arcsnd` on this build's unstripped binary. Only write() and
+// formatting here: the handler may run with the heap broken.
+void put(const char *s)
+{
+	size_t n = 0;
+	while (s[n]) n++;
+	if (write(2, s, n) < 0) {}
+}
+
+void put_hex(uint32_t v)
+{
+	char b[12] = " 0x";
+	for (int i = 0; i < 8; i++) b[3 + i] = "0123456789abcdef"[(v >> (28 - 4 * i)) & 15];
+	put(b);
+}
+
+void on_crash(int sig, siginfo_t *si, void *ctx)
+{
+	const mcontext_t &m = static_cast<ucontext_t *>(ctx)->uc_mcontext;
+	put("arcsnd "); put(BUILD); put(": signal"); put_hex(sig); put(" code"); put_hex(si->si_code);
+	put(" addr"); put_hex(uint32_t(uintptr_t(si->si_addr)));
+	put(" pc"); put_hex(m.arm_pc); put(" lr"); put_hex(m.arm_lr); put(" sp"); put_hex(m.arm_sp); put("\n");
+	void *bt[24];
+	const int n = backtrace(bt, 24);
+	put("arcsnd: backtrace");
+	for (int i = 0; i < n; i++) put_hex(uint32_t(uintptr_t(bt[i])));
+	put("\narcsnd: stack");
+	const uint32_t lo = uint32_t(uintptr_t(&__executable_start)), hi = uint32_t(uintptr_t(&etext));
+	const uint32_t *sp = reinterpret_cast<const uint32_t *>(m.arm_sp);
+	for (int i = 0, k = 0; i < 256 && k < 16; i++)
+		if (sp[i] >= lo && sp[i] < hi) { put_hex(sp[i]); k++; }
+	put("\n");
+	signal(sig, SIG_DFL);
+	raise(sig);
+}
+
+// before main and every other static constructor, so that a crash in either is reported; on a
+// stack of its own, so that an overflow is too
+__attribute__((constructor(101))) void install_crash_report()
+{
+	static char alt[32768];
+	stack_t ss{};
+	ss.ss_sp = alt;
+	ss.ss_size = sizeof alt;
+	sigaltstack(&ss, nullptr);
+	struct sigaction sa{};
+	sa.sa_sigaction = on_crash;
+	sa.sa_flags = SA_SIGINFO | SA_ONSTACK;
+	sigemptyset(&sa.sa_mask);
+	for (int s : {SIGSEGV, SIGBUS, SIGILL, SIGFPE, SIGABRT}) sigaction(s, &sa, nullptr);
+	void *bt[1];
+	backtrace(bt, 1);                    // the unwinder's first use outside the handler
+	put("arcsnd "); put(BUILD); put(": starting\n");
+}
+
+}  // namespace
 
 int64_t now_ns()
 {

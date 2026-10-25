@@ -23,7 +23,8 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parent.parent
 SRC = REPO / "src"
 OBJ = REPO / "obj" / "arm"
-ARCH = "-O3 -marm -mcpu=cortex-a9 -mfpu=neon -mfloat-abi=hard"
+# unwind tables in the C as well: the crash report (common/daemon.cpp) walks the stack with them
+ARCH = "-O3 -marm -mcpu=cortex-a9 -mfpu=neon -mfloat-abi=hard -funwind-tables"
 CXX = f"-std=c++17 {ARCH} -Wall -Wno-sign-compare -Icommon"
 C_SRC = ["hornet/musashi/m68kcpu.c", "hornet/musashi/m68kops.c", "hornet/musashi/m68kdasm.c",
          "hornet/musashi/softfloat/softfloat.c"]
@@ -60,7 +61,7 @@ stop) if running; then halt; fi ;;
 *)
 	if running; then echo "arcsnd is running: stopping it"; halt; exit 0; fi
 	echo "starting arcsnd"; launch; sleep 3
-	if running; then echo "arcsnd started"; else echo "arcsnd failed to start:"; tail -n 5 "$LOG"; exit 1; fi
+	if running; then echo "arcsnd started"; else echo "arcsnd failed to start:"; tail -n 20 "$LOG"; exit 1; fi
 	;;
 esac
 """
@@ -118,8 +119,16 @@ def wsl(cmds):
         sys.exit(f"build failed:\n{r.stdout}{r.stderr}")
 
 
+def build_id():
+    """The commit, -dirty when the tracked files differ from it."""
+    git = lambda *a: subprocess.run(["git", "-C", str(REPO), *a], capture_output=True, text=True).stdout.strip()
+    rev = git("rev-parse", "--short", "HEAD") or "unknown"
+    return rev + ("-dirty" if git("status", "--porcelain", "--untracked-files=no") else "")
+
+
 def build(out):
     o = wsl_path(OBJ)
+    (OBJ / "arcsnd_build.h").write_text(f'#define ARCSND_BUILD "{build_id()}"\n')
     cmds = [f"cd {wsl_path(SRC)}", f"mkdir -p {o}"]
     objs = []
     for s in C_SRC:
@@ -128,7 +137,7 @@ def build(out):
         objs.append(obj)
     for s in CXX_SRC:
         obj = f"{o}/{s.replace('/', '_')[:-4]}.o"
-        cmds.append(f"arm-linux-gnueabihf-g++ {CXX} -c {s} -o {obj}")
+        cmds.append(f"arm-linux-gnueabihf-g++ {CXX} -I{o} -c {s} -o {obj}")
         objs.append(obj)
     cmds.append(f"arm-linux-gnueabihf-g++ {ARCH} -static -o {wsl_path(out)} " + " ".join(objs))
     wsl(cmds)
