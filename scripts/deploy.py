@@ -62,7 +62,7 @@ stop) if running; then halt; fi ;;
 *)
 	if running; then echo "arcsnd is running: stopping it"; halt; exit 0; fi
 	echo "starting arcsnd"; launch; sleep 3
-	if running; then echo "arcsnd started"; else echo "arcsnd failed to start:"; tail -n 20 "$LOG"; exit 1; fi
+	if running; then echo "arcsnd started:"; head -n 20 "$LOG"; else echo "arcsnd failed to start:"; tail -n 20 "$LOG"; exit 1; fi
 	;;
 esac
 """
