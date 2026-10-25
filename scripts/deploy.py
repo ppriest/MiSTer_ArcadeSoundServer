@@ -143,9 +143,11 @@ def build(out):
         objs.append(obj)
     cmds.append(f"arm-linux-gnueabihf-g++ {ARCH} -static -o {wsl_path(out)} " + " ".join(objs))
     wsl(cmds)
-    # each build kept by its commit: a crash report from that build is resolved against it
+    # each build kept by its commit, with its line tables: a crash report from that build is resolved
+    # against it. What is installed and packaged is stripped (the same addresses, a third the size)
     (OBJ / "builds").mkdir(exist_ok=True)
     shutil.copyfile(out, OBJ / "builds" / f"arcsnd_{bid}")
+    wsl([f"arm-linux-gnueabihf-strip {wsl_path(out)}"])
 
 
 def put(m, local, remote):
