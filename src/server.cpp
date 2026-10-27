@@ -24,6 +24,7 @@
 #include <cstdio>
 #include <cstring>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "daemon.h"
@@ -49,11 +50,14 @@ int main(int argc, char **argv)
 		if (!strcmp(argv[i], "-v")) verbose = true;
 		else if (!strcmp(argv[i], "-crash")) crash = true;
 	}
-	std::vector<const char *> sets;
-	hornet_sets(sets);
-	hng64_sets(sets);
+	// each set with the core (the .mra's <rbf>) that runs it
 	fprintf(stderr, "Game titles supported:\n");
-	for (const char *s : sets) fprintf(stderr, "%s\n", s);
+	for (const auto &[core, list] : {std::pair{"KonamiHornet", hornet_sets}, std::pair{"HyperNG64", hng64_sets}})
+	{
+		std::vector<const char *> sets;
+		list(sets);
+		for (const char *s : sets) fprintf(stderr, "%-10s  %s\n", s, core);
+	}
 
 	const int mem = open("/dev/mem", O_RDWR | O_SYNC);
 	if (mem < 0) { perror("/dev/mem"); return 1; }
