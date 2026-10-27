@@ -49,6 +49,11 @@ uint32_t sample_bytes(const char *name)
 
 }  // namespace
 
+void hornet_sets(std::vector<const char *> &out)
+{
+	for (const set_info &s : SETS) out.push_back(s.name);
+}
+
 bool hornet_claims(const char *name)
 {
 	return sample_bytes(name) != 0;

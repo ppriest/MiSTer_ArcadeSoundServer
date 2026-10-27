@@ -61,8 +61,8 @@ start) running || launch ;;
 stop) if running; then halt; fi ;;
 *)
 	if running; then echo "arcsnd is running: stopping it"; halt; exit 0; fi
-	echo "starting arcsnd"; launch; sleep 3
-	if running; then echo "arcsnd started:"; head -n 20 "$LOG"; else echo "arcsnd failed to start:"; tail -n 20 "$LOG"; exit 1; fi
+	echo "starting arcsnd"; launch; sleep 5
+	if running; then echo "arcsnd started:"; cat "$LOG"; else echo "arcsnd failed to start:"; cat "$LOG"; exit 1; fi
 	;;
 esac
 """
@@ -130,7 +130,8 @@ def build_id():
 def build(out):
     o = wsl_path(OBJ)
     bid = build_id()
-    (OBJ / "arcsnd_build.h").write_text(f'#define ARCSND_BUILD "{bid}"\n')
+    (OBJ / "arcsnd_build.h").write_text(f'#define ARCSND_BUILD "{bid}"\n'
+                                        f'#define ARCSND_DATE "{time.strftime("%Y/%m/%d")}"\n')
     cmds = [f"cd {wsl_path(SRC)}", f"mkdir -p {o}"]
     objs = []
     for s in C_SRC:

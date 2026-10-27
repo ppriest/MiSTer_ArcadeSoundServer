@@ -20,6 +20,9 @@
 #else
 #define ARCSND_BUILD "unknown"
 #endif
+#ifndef ARCSND_DATE
+#define ARCSND_DATE "unknown"
+#endif
 
 extern "C" char __executable_start, etext;     // the linker's: the static binary's code
 
@@ -84,7 +87,7 @@ __attribute__((constructor(101))) void install_crash_report()
 	for (int s : {SIGSEGV, SIGBUS, SIGILL, SIGFPE, SIGABRT}) sigaction(s, &sa, nullptr);
 	void *bt[1];
 	backtrace(bt, 1);                    // the unwinder's first use outside the handler
-	put("arcsnd "); put(BUILD); put(": starting\n");
+	put("Arcade Sound Server - Paul Priest\nBuild: " ARCSND_DATE " ("); put(BUILD); put(")\n");
 }
 
 }  // namespace

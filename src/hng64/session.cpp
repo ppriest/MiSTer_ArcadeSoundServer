@@ -156,6 +156,11 @@ struct resampler
 
 }  // namespace
 
+void hng64_sets(std::vector<const char *> &out)
+{
+	for (const char *s : SETS) out.push_back(s);
+}
+
 bool hng64_claims(const char *name)
 {
 	for (const char *s : SETS)

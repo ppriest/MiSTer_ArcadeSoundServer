@@ -9,8 +9,8 @@
 //   hng64   SNK Hyper NeoGeo 64: hng64/session.cpp, Arcade-HyperNG64_MiSTer's rtl/hng64_sndbridge.sv
 // (docs/PROTOCOL.md)
 //
-//   arcsnd [-v] [-crash]   on stderr always: the build, each startup step, each core name, each
-//                          board's start and stop
+//   arcsnd [-v] [-crash]   on stderr always: the build and its date, the sets it plays, each
+//                          startup step, each core name, each board's start and stop
 //                          -v: a status line every 5 s as well (the scripts leave it out: it grows
 //                          /tmp/arcsnd.log for as long as a board plays)
 //                          -crash: crash after starting up, to check the crash report
@@ -24,9 +24,12 @@
 #include <cstdio>
 #include <cstring>
 #include <string>
+#include <vector>
 
 #include "daemon.h"
 
+void hornet_sets(std::vector<const char *> &out);
+void hng64_sets(std::vector<const char *> &out);
 bool hornet_claims(const char *name);
 void hornet_run(int mem, bool verbose);
 bool hng64_claims(const char *name);
@@ -46,6 +49,11 @@ int main(int argc, char **argv)
 		if (!strcmp(argv[i], "-v")) verbose = true;
 		else if (!strcmp(argv[i], "-crash")) crash = true;
 	}
+	std::vector<const char *> sets;
+	hornet_sets(sets);
+	hng64_sets(sets);
+	fprintf(stderr, "Game titles supported:\n");
+	for (const char *s : sets) fprintf(stderr, "%s\n", s);
 
 	const int mem = open("/dev/mem", O_RDWR | O_SYNC);
 	if (mem < 0) { perror("/dev/mem"); return 1; }
