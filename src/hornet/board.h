@@ -11,8 +11,10 @@
 #include <memory>
 #include "mame_shim.h"
 #include "rf5c400.h"
+#include "m68k_bus.h"
 
-class hornet_board
+// an m68k_bus, so that Musashi's callbacks (common/m68k_bus.cpp, shared with the Model 3 board) reach it
+class hornet_board : public m68k_bus
 {
 public:
 	static constexpr u32 CPU_HZ = 16'000'000;
@@ -43,11 +45,11 @@ public:
 	std::function<void(s64, char, u32, u32)> m_log;
 	s64 m_cycles_run = 0;
 
-	// Musashi's memory callbacks land here
-	u32 read8(u32 a);
-	u32 read16(u32 a);
-	void write8(u32 a, u32 d);
-	void write16(u32 a, u32 d);
+	// Musashi's memory callbacks land here (through m68k_bus's virtuals since the Model 3 board)
+	u32 read8(u32 a) override;
+	u32 read16(u32 a) override;
+	void write8(u32 a, u32 d) override;
+	void write16(u32 a, u32 d) override;
 
 private:
 	s64 now() const;

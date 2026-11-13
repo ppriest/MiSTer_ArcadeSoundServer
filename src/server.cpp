@@ -7,6 +7,8 @@
 //   hornet  Konami Hornet (Gradius IV): hornet/session.cpp, Arcade-KonamiHornet_MiSTer's
 //           rtl/mister/hornet_sndbridge.sv
 //   hng64   SNK Hyper NeoGeo 64: hng64/session.cpp, Arcade-HyperNG64_MiSTer's rtl/hng64_sndbridge.sv
+//   model3  Sega Model 3: model3/session.cpp, SegaModel3_MiSTer's rtl/sound/m3_sndbridge.sv
+//           (added for my Model 3 core: its 68000 and SCSP slots run here, the SCSP DSPs in the FPGA)
 // (docs/PROTOCOL.md)
 //
 //   arcsnd [-v] [-crash]   on stderr always: the build and its date, the sets it plays, each
@@ -15,6 +17,7 @@
 //                          /tmp/arcsnd.log for as long as a board plays)
 //                          -crash: crash after starting up, to check the crash report
 
+#include <dirent.h>
 #include <fcntl.h>
 #include <sched.h>
 #include <sys/file.h>
@@ -35,9 +38,55 @@ bool hornet_claims(const char *name);
 void hornet_run(int mem, bool verbose);
 bool hng64_claims(const char *name);
 void hng64_run(int mem, bool verbose);
+// the Model 3 board, dispatched like the other two; its sets go into the banner's list
+void model3_sets(std::vector<const char *> &out);
+bool model3_claims(const char *name);
+void model3_run(int mem, bool verbose);
 
 namespace {
 void on_signal(int) { arcsnd::g_stop = 1; }
+
+// Core 0 kept for a board while it plays: every device interrupt goes to core 1, and back as it was when
+// the board stops. The USB controller's all land on core 0 by default, and a Sinden gun's camera (about
+// 12,000 a second) starved the Model 3 board into its core's 93 ms watchdog, 18 resets in 45 s; on core
+// 1, none. The per-CPU interrupts refuse the write and stay where they are.
+struct irq_move { std::string path, mask; };
+std::vector<irq_move> irqs_to_core1()
+{
+	std::vector<irq_move> moved;
+	if (DIR *d = opendir("/proc/irq"))
+	{
+		while (const dirent *e = readdir(d))
+		{
+			if (e->d_name[0] < '0' || e->d_name[0] > '9') continue;
+			const std::string path = std::string("/proc/irq/") + e->d_name + "/smp_affinity";
+			char was[32] = {};
+			const int r = open(path.c_str(), O_RDONLY);
+			if (r < 0) continue;
+			const ssize_t n = read(r, was, sizeof was - 1);
+			close(r);
+			if (n <= 0) continue;
+			const int w = open(path.c_str(), O_WRONLY);
+			if (w < 0) continue;
+			if (write(w, "2\n", 2) == 2) moved.push_back({path, std::string(was, n)});
+			close(w);
+		}
+		closedir(d);
+	}
+	fprintf(stderr, "arcsnd: %zu interrupts on core 1 while the board plays\n", moved.size());
+	return moved;
+}
+void irqs_back(const std::vector<irq_move> &moved)
+{
+	for (const irq_move &m : moved)
+	{
+		const int w = open(m.path.c_str(), O_WRONLY);
+		if (w < 0) continue;
+		if (write(w, m.mask.data(), m.mask.size()) < 0) {}
+		close(w);
+	}
+	fprintf(stderr, "arcsnd: %zu interrupts back where they were\n", moved.size());
+}
 }
 
 int main(int argc, char **argv)
@@ -52,7 +101,7 @@ int main(int argc, char **argv)
 	}
 	// each set with the core (the .mra's <rbf>) that runs it
 	fprintf(stderr, "Game titles supported:\n");
-	for (const auto &[core, list] : {std::pair{"KonamiHornet", hornet_sets}, std::pair{"HyperNG64", hng64_sets}})
+	for (const auto &[core, list] : {std::pair{"KonamiHornet", hornet_sets}, std::pair{"HyperNG64", hng64_sets}, std::pair{"Model3", model3_sets}})
 	{
 		std::vector<const char *> sets;
 		list(sets);
@@ -92,12 +141,23 @@ int main(int argc, char **argv)
 		if (hornet_claims(c.name.c_str()))
 		{
 			fprintf(stderr, "arcsnd: %s, the Hornet board\n", c.name.c_str());
+			const auto moved = irqs_to_core1();
 			hornet_run(mem, verbose);
+			irqs_back(moved);
 		}
 		else if (hng64_claims(c.name.c_str()))
 		{
 			fprintf(stderr, "arcsnd: %s, the hng64 board\n", c.name.c_str());
+			const auto moved = irqs_to_core1();
 			hng64_run(mem, verbose);
+			irqs_back(moved);
+		}
+		else if (model3_claims(c.name.c_str()))
+		{
+			fprintf(stderr, "arcsnd: %s, the Model 3 sound board\n", c.name.c_str());
+			const auto moved = irqs_to_core1();
+			model3_run(mem, verbose);
+			irqs_back(moved);
 		}
 		else arcsnd::sleep_ns(250'000'000);
 	}

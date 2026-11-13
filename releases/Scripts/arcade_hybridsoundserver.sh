@@ -1,5 +1,5 @@
 #!/bin/sh
-# arcsnd: arcade sound boards on the ARM (Konami Hornet, Hyper NeoGeo 64), in the background. It
+# arcsnd: arcade sound boards on the ARM (Konami Hornet, Hyper NeoGeo 64, Sega Model 3), in the background. It
 # waits for a set it knows, goes quiet at every core load, and runs as one copy.
 #   (no argument)  from the Scripts menu: stop it if it is running, else start it
 #   start          start it if it is not running (linux/user-startup.sh's $1 at boot)

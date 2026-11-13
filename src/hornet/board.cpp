@@ -9,6 +9,7 @@
 extern "C" {
 #include "musashi/m68k.h"
 }
+#include "m68k_bus.h"     // Musashi's memory callbacks (below, before the Model 3 board)
 
 namespace {
 
@@ -18,24 +19,11 @@ constexpr s64 UPDATE_TICKS = hornet_board::CPU_HZ / 50;    // MAME's STREAMS_UPD
 
 }
 
-extern "C" {
-unsigned int m68k_read_memory_8(unsigned int a) { return g_board->read8(a & 0xffffff); }
-unsigned int m68k_read_memory_16(unsigned int a) { return g_board->read16(a & 0xffffff); }
-unsigned int m68k_read_memory_32(unsigned int a)
-{
-	return g_board->read16(a & 0xffffff) << 16 | g_board->read16((a + 2) & 0xffffff);
-}
-void m68k_write_memory_8(unsigned int a, unsigned int d) { g_board->write8(a & 0xffffff, d & 0xff); }
-void m68k_write_memory_16(unsigned int a, unsigned int d) { g_board->write16(a & 0xffffff, d & 0xffff); }
-void m68k_write_memory_32(unsigned int a, unsigned int d)
-{
-	g_board->write16(a & 0xffffff, d >> 16);
-	g_board->write16((a + 2) & 0xffffff, d & 0xffff);
-}
-unsigned int m68k_read_disassembler_16(unsigned int a) { return g_board->read16(a & 0xffffff); }
-unsigned int m68k_read_disassembler_32(unsigned int a) { return m68k_read_memory_32(a); }
-}
-
+// Musashi's m68k_read_memory_* / m68k_write_memory_* callbacks were defined here. I moved them to
+// common/m68k_bus.cpp when the Model 3 board came in: it links a second 68000 board (and a third
+// Musashi context for its Digital Sound Board) into the same binary, and two definitions of the
+// callbacks cannot link. They now call the board g_m68k_bus points at, which is this one while the
+// Hornet board runs; what Musashi reads and writes is unchanged.
 hornet_board::hornet_board(const u8 *prog, const u8 *samples, u32 samples_bytes)
 	: m_prog(new u8[0x80000]), m_ram(new u8[0x10000]), m_pcm(samples, samples_bytes, PCM_CLOCK)
 {
@@ -46,6 +34,7 @@ hornet_board::hornet_board(const u8 *prog, const u8 *samples, u32 samples_bytes)
 	}
 	memset(m_ram.get(), 0, 0x10000);
 	g_board = this;
+	g_m68k_bus = this;          // Musashi's callbacks to this board (common/m68k_bus)
 	m68k_init();
 	m68k_set_cpu_type(M68K_CPU_TYPE_68000);
 	restart_timer(0);
@@ -56,6 +45,7 @@ hornet_board::hornet_board(const u8 *prog, const u8 *samples, u32 samples_bytes)
 hornet_board::~hornet_board()
 {
 	if (g_board == this) g_board = nullptr;
+	if (g_m68k_bus == this) g_m68k_bus = nullptr;
 }
 
 // the periodic interrupt (16.9344 MHz / 384 / 128) restarts with the CPU: MAME's set_periodic_int

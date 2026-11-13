@@ -26,11 +26,16 @@ OBJ = REPO / "obj" / "arm"
 # unwind tables in the C as well, and line tables: the crash report (common/daemon.cpp) walks the
 # stack with the first, addr2line resolves it with the second
 ARCH = "-O3 -g -marm -mcpu=cortex-a9 -mfpu=neon -mfloat-abi=hard -funwind-tables"
-CXX = f"-std=c++17 {ARCH} -Wall -Wno-sign-compare -Icommon"
+# -Icommon/miniz and the Model 3 sources below were added with the Model 3 board: miniz reads its sound ROMs
+# from the set's zip, dsb_m68k.c is its Digital Sound Board's, and common/m68k_bus.cpp holds Musashi's
+# memory callbacks for both 68000 boards
+CXX = f"-std=c++17 {ARCH} -Wall -Wno-sign-compare -Icommon -Icommon/miniz"
 C_SRC = ["hornet/musashi/m68kcpu.c", "hornet/musashi/m68kops.c", "hornet/musashi/m68kdasm.c",
-         "hornet/musashi/softfloat/softfloat.c"]
-CXX_SRC = ["server.cpp", "common/daemon.cpp", "common/logerror.cpp",
+         "hornet/musashi/softfloat/softfloat.c", "common/miniz/miniz.c", "model3/dsb_m68k.c"]
+CXX_SRC = ["server.cpp", "common/daemon.cpp", "common/logerror.cpp", "common/m68k_bus.cpp",
            "hornet/board.cpp", "hornet/rf5c400.cpp", "hornet/session.cpp",
+           "model3/board.cpp", "model3/SCSP.cpp", "model3/SCSPDSP.cpp", "model3/scspdsp_jit.cpp", "model3/dsplink_shm.cpp", "model3/roms.cpp", "model3/session.cpp",
+           "model3/dsb.cpp", "model3/z80/Z80.cpp",
            "hng64/nec_core.cpp", "hng64/v53.cpp", "hng64/l7a1045.cpp", "hng64/board.cpp", "hng64/session.cpp"]
 SETS = ["gradius4", "gradius4u", "gradius4a", "gradius4ja", "gradius4ua", "gradius4aa",
         "nbapbp", "nbapbpa", "nbapbpj", "nbapbpua", "nbapbpaa", "nbapbpja", "nbaatw", "nbaatwa"]
@@ -46,7 +51,7 @@ exec ./arcsnd 2>/tmp/arcsnd.log
 """
 
 START = """#!/bin/sh
-# arcsnd: arcade sound boards on the ARM (Konami Hornet, Hyper NeoGeo 64), in the background. It
+# arcsnd: arcade sound boards on the ARM (Konami Hornet, Hyper NeoGeo 64, Sega Model 3), in the background. It
 # waits for a set it knows, goes quiet at every core load, and runs as one copy.
 #   (no argument)  from the Scripts menu: stop it if it is running, else start it
 #   start          start it if it is not running (linux/user-startup.sh's $1 at boot)
