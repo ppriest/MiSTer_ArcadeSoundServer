@@ -15,66 +15,6 @@ set has.
 Without the server the cores still run: their bridge answers the main CPU's sound handshake, and
 the game is silent.
 
-## Sega Model 3
-
-I added the Model 3 board for my Model 3 core (`SegaModel3_MiSTer`). It splits the sound board between
-the ARM and the FPGA, because one Cortex-A9 core cannot run the whole board in the time a sample has:
-
-* **On the ARM:** the 68000 (arcsnd's Musashi) and both SCSPs' slots, from Supermodel's sound board
-  and SCSP. The output is Supermodel's, sample for sample. The SCSP's timers follow the arcade's
-  period, measured on a cabinet; Supermodel's own model is kept as a mode.
-* **In the FPGA:** both SCSPs' effects DSPs, their effect return and the clip (the core's
-  `m3_scsp_dsp`, inside its sound bridge `m3_sndbridge`). The server sends each sample's dry sums
-  and DSP inputs as a record, and the 68000's writes to the DSP as commands, through a 2 MiB block
-  of DDR3 at 0x3F200000 (`docs/PROTOCOL.md`, Model 3 version 2). The FPGA plays the result on the
-  core's own clock, D samples (256, 5.8 ms) after the server could first render it. This board
-  does not use the framework's ALSA path.
-* **The Digital Sound Board** of Scud Race (DSB1: a Z80), Daytona 2 and Sega Rally 2 (DSB2: a 68000) runs on the
-  ARM as well: Supermodel's DSB with minimp3 for the MPEG music. Its music goes into the records'
-  front dry sums, so the FPGA needs nothing more for it.
-* **The ROMs** (the 68000 program, the SCSP samples, the DSB's program and MPEG data) are read from
-  the set's zip, and its parent's, in MiSTer's mame folders, while Main is loading the set into the
-  core. The core loads nothing for sound. `src/model3/roms_table.h` has each set's file names,
-  offsets and CRC-32s, made by `scripts/m3snd_table.py` from Supermodel's `Games.xml`; no ROM data.
-
-It needs a build of the Model 3 core with the sound link (its `SND_DSP` on). Without the server
-that core runs silent.
-
-**Why the DSPs are in the FPGA.** I first ran the whole board on the ARM. Measured on the MiSTer,
-it did not keep up:
-* The two DSPs were about two thirds of the work. Each runs its program of up to 128 steps for every
-  sample, playing or silent, as the chip does: that is what keeps reverb and echo tails going.
-* Even with each DSP program translated to ARM code, the worst second of play needed 100-108% of one
-  A9 core (VF3, Lost World, Bass Fishing), and only buffering of about 100 ms could have hidden it.
-* MiSTer Main keeps the other core busy all the time, so there was no second core to spread onto.
-
-With the DSPs in the FPGA, the ARM's worst second of play falls to 65-77% of the core, which leaves
-room for the Digital Sound Board. In the FPGA the DSPs cost about 570 ALM and add one sample of
-delay, and running every sample costs them nothing.
-
-**The SCSP here is not a whole SCSP.** This board does not run the SCSPs' DSPs: it sends their
-inputs and the 68000's writes to them to the core, and expects the core to run the DSPs, add their
-effect return and play the result. A core that runs only a bridge to the server, with no DSP in
-the FPGA, gets no sound from this board. Any other core that wants to use this SCSP session (for an
-SCSP board other than Model 3's) has to carry the FPGA side as well:
-
-* **The RTL:** `m3_scsp_dsp.sv` (the DSP engine, both chips) and `m3_sndbridge.sv` (the bridge) from
-  `SegaModel3_MiSTer`'s `rtl/sound/`, GPL-3.0-or-later. About 570 ALM, 135 M10K (the two effect
-  rings) and 2 DSP blocks on the Cyclone V.
-* **The bridge's connections:**
-  * the main CPU's writes to the sound board's port (`midi_we`, `midi_data`: 1 for the data port,
-    `midi_byte`), which it time-stamps for the server;
-  * one DDR3 port (`d_*`: request, write, 25-bit word address, burst length, data, byte enables,
-    acknowledge, read valid, read data) on the core's DDR3 arbiter;
-  * `audio_l` / `audio_r`, signed 16-bit, to the core's audio out;
-  * the core clock (`CLK_HZ` must be its frequency, for the 44.1 kHz sample clock) and a reset.
-* **Its parameters:** `BLOCK` is the shared block's DDR3 word address (byte 0x3F200000 here; it must
-  match the server's), `D` the play delay in samples (256).
-* **The protocol:** `docs/PROTOCOL.md`, Model 3 version 2, with the v4 command format: the server
-  pre-decodes every DSP write into a kind, an address and a value, so the engine decodes nothing.
-  A core's bridge and the server must agree on this format and on the block's layout exactly. Run by hand with `-v`, the status line also gives how far behind the server
-ran, and the share of the core its writes to the block took.
-
 ## Installation
 
 * Unzip the latest `releases/arcsnd_<YYYYMMDD>.zip` onto the SD card's root. It holds
