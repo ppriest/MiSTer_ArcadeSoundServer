@@ -21,10 +21,10 @@
 #include "m68k_bus.h"
 #include "sm_bus.h"
 #include "sm_shim.h"
-#include "z80/Z80.h"
+#include "cpus/z80/Z80.h"
 
 extern "C" {
-#include "../hornet/musashi/m68k.h"
+#include "cpus/musashi/m68k.h"
 int dsb_m68k_runs_plain(void);         // dsb_m68k.c
 }
 

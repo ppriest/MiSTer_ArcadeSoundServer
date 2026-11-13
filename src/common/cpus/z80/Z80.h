@@ -47,8 +47,8 @@
 #define INCLUDED_Z80_H
 
 // arcsnd: Supermodel's types, IBus and CBlockFile from the shims (PROVENANCE.md)
-#include "../sm_shim.h"
-#include "../sm_bus.h"
+#include "../../../model3/sm_shim.h"
+#include "../../../model3/sm_bus.h"
 
 /*
  * Special Return Codes for Interrupt Callbacks

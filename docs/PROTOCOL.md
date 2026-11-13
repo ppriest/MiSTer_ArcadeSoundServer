@@ -5,7 +5,7 @@ window starts at `0x30000000`), written and read by its bridge in the FPGA and m
 through `/dev/mem`. Little-endian 64-bit words; offsets in bytes. The core's bridge source is the
 authority; these tables are copied from their headers.
 
-Common to both:
+Common to Hornet and HNG64 (Firebeat's block is write-only, below):
 
 * A magic and version at +0x00 tells the server which board's block it is and that the bridge has
   reset. DDR3 is not cleared between cores, so a block left by another core can still be there:
@@ -124,3 +124,19 @@ samples late it is skipped. So:
 The first design had the whole board on the ARM, with a PCM ring at +0x10000 that the FPGA played,
 and the sound ROMs in DDR3 at 0x3E000000. One A9 core could not run it in real time, so the DSP
 moved into the FPGA and the block became version 2.
+## Konami Firebeat Keyboardmania (`rtl/board/fb_midibridge.sv`, version 1)
+
+Write-only: the server writes nothing back, and the core runs the same with or without it.
+
+| Offset | Contents | Writer |
+|---|---|---|
+| +0x00 | "FBMI", version 1 | FPGA, every BEAT (10 ms) |
+| +0x10 | {count of ring entries written, 32} | FPGA, after each entry |
+| +0x18 | {beat count (+1 every BEAT), 32} | FPGA, every BEAT |
+| +0x20 | {board resets 16, 0 15, held 1} | FPGA, every BEAT and on each change |
+| +0x1000 | ring of 512 entries {0 16, byte 8, 0 8, microseconds 32} | FPGA |
+
+Each byte chan1's UART sends (the XT446's MIDI in) becomes an entry stamped when its stop bit went
+out; the server plays it at that stamp mapped onto its output 10 ms later, keeping the stamps'
+spacing. held (the board paused or in reset) releases every note; a new board reset count resets
+the synth.

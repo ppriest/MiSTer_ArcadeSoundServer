@@ -6,10 +6,9 @@
 
 Cross-compiles with WSL's arm-linux-gnueabihf-gcc/g++ (static). Installs
 /media/fat/games/arcsnd/arcsnd; Scripts/arcade_hybridsoundserver.sh, which starts or stops it from the Scripts menu
-(`start` at boot from linux/user-startup.sh); and, per Hornet set, games/<set>/_handler.sh, which
-MiSTer Frontier's Master_Daemon.sh runs while that set is loaded (/tmp/CORENAME is the .mra's
-setname). --package writes releases/arcsnd_<YYYYMMDD>.zip, the files where they go under
-/media/fat.
+(`start` at boot from linux/user-startup.sh). --package writes releases/arcsnd_<YYYYMMDD>.zip, the files where they go under
+/media/fat. games/arcsnd/arcsnd.ini is installed when there is none; packages leave it out, so an
+update keeps the user's.
 """
 import argparse
 import os
@@ -30,25 +29,21 @@ ARCH = "-O3 -g -marm -mcpu=cortex-a9 -mfpu=neon -mfloat-abi=hard -funwind-tables
 # from the set's zip, dsb_m68k.c is its Digital Sound Board's, and common/m68k_bus.cpp holds Musashi's
 # memory callbacks for both 68000 boards
 CXX = f"-std=c++17 {ARCH} -Wall -Wno-sign-compare -Icommon -Icommon/miniz"
-C_SRC = ["hornet/musashi/m68kcpu.c", "hornet/musashi/m68kops.c", "hornet/musashi/m68kdasm.c",
-         "hornet/musashi/softfloat/softfloat.c", "common/miniz/miniz.c", "model3/dsb_m68k.c"]
-CXX_SRC = ["server.cpp", "common/daemon.cpp", "common/logerror.cpp", "common/m68k_bus.cpp",
+C_SRC = ["common/cpus/musashi/m68kcpu.c", "common/cpus/musashi/m68kops.c", "common/cpus/musashi/m68kdasm.c",
+         "common/cpus/musashi/softfloat/softfloat.c", "common/miniz/miniz.c", "model3/dsb_m68k.c"]
+CXX_SRC = ["server.cpp", "common/daemon.cpp", "common/logerror.cpp", "common/m68k_bus.cpp", "common/config.cpp",
            "hornet/board.cpp", "hornet/rf5c400.cpp", "hornet/session.cpp",
            "model3/board.cpp", "model3/SCSP.cpp", "model3/SCSPDSP.cpp", "model3/scspdsp_jit.cpp", "model3/dsplink_shm.cpp", "model3/roms.cpp", "model3/session.cpp",
-           "model3/dsb.cpp", "model3/z80/Z80.cpp",
-           "hng64/nec_core.cpp", "hng64/v53.cpp", "hng64/l7a1045.cpp", "hng64/board.cpp", "hng64/session.cpp"]
-SETS = ["gradius4", "gradius4u", "gradius4a", "gradius4ja", "gradius4ua", "gradius4aa",
-        "nbapbp", "nbapbpa", "nbapbpj", "nbapbpua", "nbapbpaa", "nbapbpja", "nbaatw", "nbaatwa"]
+           "model3/dsb.cpp", "common/cpus/z80/Z80.cpp",
+           "hng64/nec_core.cpp", "hng64/v53.cpp", "hng64/l7a1045.cpp", "hng64/board.cpp", "hng64/session.cpp",
+           "firebeat/synth.cpp", "firebeat/session.cpp"]
+# Keyboardmania's SoundFonts, installed beside arcsnd: the XG set arcsnd.ini names, and TimGM6mb when it
+# is not there (src/firebeat/session.cpp's order)
+SF2S = [REPO / "assets" / "Yamaha XG Sound Set.sf2", REPO / "assets" / "TimGM6mb.sf2"]
+# installed when there is none, so a user's edits stand
+INI = REPO / "assets" / "arcsnd.ini"
 REMOTE_DIR = "/media/fat/games/arcsnd"
 REMOTE_START = "/media/fat/Scripts/arcade_hybridsoundserver.sh"
-
-HANDLER = """#!/bin/sh
-# Hornet sound: the sound board on the ARM (MiSTer_ArcadeSoundServer). MiSTer Frontier's Master_Daemon.sh runs
-# this while the set is loaded and kills it when the core changes.
-cd {dir} || exit 1
-chmod +x arcsnd
-exec ./arcsnd 2>/tmp/arcsnd.log
-"""
 
 START = """#!/bin/sh
 # arcsnd: arcade sound boards on the ARM (Konami Hornet, Hyper NeoGeo 64, Sega Model 3), in the background. It
@@ -141,7 +136,7 @@ def build(out):
     objs = []
     for s in C_SRC:
         obj = f"{o}/{Path(s).stem}.o"
-        cmds.append(f"arm-linux-gnueabihf-gcc {ARCH} -Ihornet/musashi -c {s} -o {obj}")
+        cmds.append(f"arm-linux-gnueabihf-gcc {ARCH} -Icommon/cpus/musashi -c {s} -o {obj}")
         objs.append(obj)
     for s in CXX_SRC:
         obj = f"{o}/{s.replace('/', '_')[:-4]}.o"
@@ -176,10 +171,12 @@ def main():
     if a.package:
         out = REPO / "releases" / f"arcsnd_{time.strftime('%Y%m%d')}.zip"
         with zipfile.ZipFile(out, "w") as z:
-            for path, data in ((REMOTE_DIR + "/arcsnd", binary.read_bytes()), (REMOTE_START, start.read_bytes())):
+            files = [(REMOTE_DIR + "/arcsnd", binary.read_bytes()), (REMOTE_START, start.read_bytes())]
+            files += [(REMOTE_DIR + "/" + f.name, f.read_bytes()) for f in SF2S]
+            for path, data in files:
                 zi = zipfile.ZipInfo(path.removeprefix("/media/fat/"), time.localtime()[:6])
                 zi.create_system = 3
-                zi.external_attr = 0o100755 << 16
+                zi.external_attr = (0o100644 if path.endswith(".sf2") else 0o100755) << 16
                 zi.compress_type = zipfile.ZIP_DEFLATED
                 z.writestr(zi, data)
                 # ... and the same files unpacked under releases/ in the SD card's layout, for a
@@ -197,14 +194,12 @@ def main():
     put(m, binary, f"{REMOTE_DIR}/arcsnd")
     m.sh(f"chmod +x {REMOTE_DIR}/arcsnd")
     put(m, start, REMOTE_START)
+    for f in SF2S:
+        put(m, f, f"{REMOTE_DIR}/{f.name}")
+    if m.sh(f"test -e {REMOTE_DIR}/{INI.name} || echo none").strip() == "none":
+        put(m, INI, f"{REMOTE_DIR}/{INI.name}")
     m.sh(f"chmod +x {REMOTE_START}")
-    for s in SETS:
-        h = OBJ / f"_handler_{s}.sh"
-        h.write_bytes(HANDLER.format(dir=REMOTE_DIR).encode())
-        m.sh(f"mkdir -p /media/fat/games/{s}")
-        put(m, h, f"/media/fat/games/{s}/_handler.sh")
-        m.sh(f"chmod +x /media/fat/games/{s}/_handler.sh")
-    print(f"-> {REMOTE_DIR}/arcsnd, {REMOTE_START}, handlers for {', '.join(SETS)}")
+    print(f"-> {REMOTE_DIR}/arcsnd, {REMOTE_START}")
     return 0
 
 

@@ -7,7 +7,7 @@
 #include "board.h"
 
 extern "C" {
-#include "musashi/m68k.h"
+#include "cpus/musashi/m68k.h"
 }
 #include "m68k_bus.h"     // Musashi's memory callbacks (below, before the Model 3 board)
 

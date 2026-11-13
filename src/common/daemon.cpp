@@ -87,7 +87,7 @@ __attribute__((constructor(101))) void install_crash_report()
 	for (int s : {SIGSEGV, SIGBUS, SIGILL, SIGFPE, SIGABRT}) sigaction(s, &sa, nullptr);
 	void *bt[1];
 	backtrace(bt, 1);                    // the unwinder's first use outside the handler
-	put("Arcade Sound Server - Paul Priest\nBuild: " ARCSND_DATE " ("); put(BUILD); put(")\n");
+	put("Arcade Sound Server\nBuild: " ARCSND_DATE " ("); put(BUILD); put(")\n");
 }
 
 }  // namespace

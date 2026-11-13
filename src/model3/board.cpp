@@ -9,7 +9,7 @@
 #include "SCSP.h"
 
 extern "C" {
-#include "../hornet/musashi/m68k.h"
+#include "cpus/musashi/m68k.h"
 }
 
 namespace {
