@@ -7,8 +7,8 @@
 Cross-compiles with WSL's arm-linux-gnueabihf-gcc/g++ (static). Installs
 /media/fat/games/arcsnd/arcsnd; Scripts/arcade_hybridsoundserver.sh, which starts or stops it from the Scripts menu
 (`start` at boot from linux/user-startup.sh). --package writes releases/arcsnd_<YYYYMMDD>.zip, the files where they go under
-/media/fat. games/arcsnd/arcsnd.ini is installed when there is none; packages leave it out, so an
-update keeps the user's.
+/media/fat, arcsnd.ini included (unpacking it over an install replaces the user's). deploy.py itself installs
+games/arcsnd/arcsnd.ini only when there is none.
 """
 import argparse
 import os
@@ -173,10 +173,11 @@ def main():
         with zipfile.ZipFile(out, "w") as z:
             files = [(REMOTE_DIR + "/arcsnd", binary.read_bytes()), (REMOTE_START, start.read_bytes())]
             files += [(REMOTE_DIR + "/" + f.name, f.read_bytes()) for f in SF2S]
+            files.append((REMOTE_DIR + "/" + INI.name, INI.read_bytes()))
             for path, data in files:
                 zi = zipfile.ZipInfo(path.removeprefix("/media/fat/"), time.localtime()[:6])
                 zi.create_system = 3
-                zi.external_attr = (0o100644 if path.endswith(".sf2") else 0o100755) << 16
+                zi.external_attr = (0o100644 if path.endswith((".sf2", ".ini")) else 0o100755) << 16
                 zi.compress_type = zipfile.ZIP_DEFLATED
                 z.writestr(zi, data)
                 # ... and the same files unpacked under releases/ in the SD card's layout, for a

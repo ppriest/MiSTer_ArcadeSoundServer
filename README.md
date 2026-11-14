@@ -75,7 +75,7 @@ ahead of the FPGA's playback.
 | `src/model3/` | the Model 3 sound board: Musashi 68000, Supermodel's SCSP, board logic and Digital Sound Board (its Z80, minimp3), the link to the FPGA's DSP, the ROMs from the zip |
 | `src/firebeat/` | Keyboardmania's MIDI: the parser over TinySoundFont, the session |
 | `assets/` | the default `arcsnd.ini` and SoundFonts |
-| `assets/arcsnd.ini` | the settings, a section per system; installed when the MiSTer has none |
+| `assets/arcsnd.ini` | the settings, a section per system; in the release zip, and installed by `deploy.py` when the MiSTer has none |
 | `docs/PROTOCOL.md` | the shared DDR3 blocks |
 | `scripts/deploy.py` | build, install, package |
 | `releases/` | packaged builds |
