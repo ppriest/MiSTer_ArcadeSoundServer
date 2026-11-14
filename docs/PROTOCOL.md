@@ -133,10 +133,11 @@ Write-only: the server writes nothing back, and the core runs the same with or w
 | +0x00 | "FBMI", version 1 | FPGA, every BEAT (10 ms) |
 | +0x10 | {count of ring entries written, 32} | FPGA, after each entry |
 | +0x18 | {beat count (+1 every BEAT), 32} | FPGA, every BEAT |
-| +0x20 | {board resets 16, 0 15, held 1} | FPGA, every BEAT and on each change |
+| +0x20 | {board resets 16, 0 14, mute 1, held 1} | FPGA, every BEAT and on each change |
 | +0x1000 | ring of 512 entries {0 16, byte 8, 0 8, microseconds 32} | FPGA |
 
 Each byte chan1's UART sends (the XT446's MIDI in) becomes an entry stamped when its stop bit went
 out; the server plays it at that stamp mapped onto its output 10 ms later, keeping the stamps'
 spacing. held (the board paused or in reset) releases every note; a new board reset count resets
-the synth.
+the synth. mute (the core's OSD sends the notes to its MIDI port alone) releases every note and
+plays silence; the bytes are still applied, so the voices are right when it clears.

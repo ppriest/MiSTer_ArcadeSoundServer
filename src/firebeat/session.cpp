@@ -8,8 +8,10 @@
 // current count. Each byte is applied at its microsecond stamp mapped onto the synth's output clock
 // LAT later, never closer to the one before than the stamps were; the synth runs a millisecond at a
 // time, ahead of the audio by audio_out's lead. The bridge's held flag (the board paused or in
-// reset) releases every note; a new board reset count resets the synth. It stops (silence) when the
-// beat stalls for 200 ms (the core reloaded), the magic goes, or the core changes.
+// reset) releases every note; a new board reset count resets the synth. The mute flag (the core's
+// OSD sends the notes to its MIDI port alone) releases every note and outputs silence, while the
+// bytes are still applied, so the voices the game set are right when it clears. It stops (silence)
+// when the beat stalls for 200 ms (the core reloaded), the magic goes, or the core changes.
 //
 // The SoundFont: arcsnd.ini's [firebeat_kbm] soundfont= if it loads, else games/arcsnd/firebeat.sf2,
 // else the Yamaha XG Sound Set.sf2 or TimGM6mb.sf2 shipped beside arcsnd. Loaded when a set starts, freed when the core changes.
@@ -92,7 +94,7 @@ void firebeat_run(int mem, bool verbose)
 
 	audio_out audio;
 	std::vector<int16_t> pcm;
-	bool running = false, held = false;
+	bool running = false, held = false, muted = false;
 	uint32_t beat_seen = 0, rd = 0, resets = 0;
 	int64_t beat_t = now_ns();
 	bool mapped = false;
@@ -160,6 +162,14 @@ void firebeat_run(int mem, bool verbose)
 		}
 		if (held_now && !held) synth.release_all();
 		held = held_now;
+		const bool muted_now = st & 2;
+		if (muted_now != muted) {
+			if (muted_now) {
+				synth.release_all();
+			}
+			fprintf(stderr, "arcsnd firebeat: %s\n", muted_now ? "muted: the notes go to the core's MIDI port" : "unmuted");
+		}
+		muted = muted_now;
 
 		audio.drain(running);
 		const int64_t loop_end = now_ns() + 20'000'000;
@@ -196,6 +206,9 @@ void firebeat_run(int mem, bool verbose)
 			synth.render(int(end - pos), pcm);
 			pos = end;
 			busy_ns += now_ns() - t0;
+			if (muted) {
+				std::fill(pcm.begin(), pcm.end(), int16_t(0));
+			}
 			audio.put(pcm, false);
 			audio.drain(running);
 		}
