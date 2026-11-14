@@ -7,8 +7,8 @@
 Cross-compiles with WSL's arm-linux-gnueabihf-gcc/g++ (static). Installs
 /media/fat/games/arcsnd/arcsnd; Scripts/arcade_hybridsoundserver.sh, which starts or stops it from the Scripts menu
 (`start` at boot from linux/user-startup.sh). --package writes releases/arcsnd_<YYYYMMDD>.zip, the files where they go under
-/media/fat, arcsnd.ini included (unpacking it over an install replaces the user's). deploy.py itself installs
-games/arcsnd/arcsnd.ini only when there is none.
+/media/fat. The settings ship as arcsnd.ini.example; the start script copies it to arcsnd.ini when there is
+none, so an update keeps the user's.
 """
 import argparse
 import os
@@ -40,8 +40,8 @@ CXX_SRC = ["server.cpp", "common/daemon.cpp", "common/logerror.cpp", "common/m68
 # Keyboardmania's SoundFonts, installed beside arcsnd: the XG set arcsnd.ini names, and TimGM6mb when it
 # is not there (src/firebeat/session.cpp's order)
 SF2S = [REPO / "assets" / "Yamaha XG Sound Set.sf2", REPO / "assets" / "TimGM6mb.sf2"]
-# installed when there is none, so a user's edits stand
-INI = REPO / "assets" / "arcsnd.ini"
+# the default settings: the start script copies them to arcsnd.ini when there is none, so a user's edits stand
+INI = REPO / "assets" / "arcsnd.ini.example"
 REMOTE_DIR = "/media/fat/games/arcsnd"
 REMOTE_START = "/media/fat/Scripts/arcade_hybridsoundserver.sh"
 
@@ -54,7 +54,7 @@ START = """#!/bin/sh
 DIR={dir}
 LOG=/tmp/arcsnd.log
 running() {{ pidof arcsnd >/dev/null; }}
-launch() {{ cd "$DIR" || exit 1; chmod +x arcsnd; setsid ./arcsnd </dev/null >/dev/null 2>"$LOG" & }}
+launch() {{ cd "$DIR" || exit 1; [ -e arcsnd.ini ] || cp arcsnd.ini.example arcsnd.ini; chmod +x arcsnd; setsid ./arcsnd </dev/null >/dev/null 2>"$LOG" & }}
 halt() {{ kill $(pidof arcsnd); sleep 1; if running; then echo "arcsnd did not stop"; exit 1; fi; echo "arcsnd stopped"; }}
 case "$1" in
 start) running || launch ;;
@@ -177,7 +177,7 @@ def main():
             for path, data in files:
                 zi = zipfile.ZipInfo(path.removeprefix("/media/fat/"), time.localtime()[:6])
                 zi.create_system = 3
-                zi.external_attr = (0o100644 if path.endswith((".sf2", ".ini")) else 0o100755) << 16
+                zi.external_attr = (0o100644 if path.endswith((".sf2", ".example")) else 0o100755) << 16
                 zi.compress_type = zipfile.ZIP_DEFLATED
                 z.writestr(zi, data)
                 # ... and the same files unpacked under releases/ in the SD card's layout, for a
@@ -197,8 +197,7 @@ def main():
     put(m, start, REMOTE_START)
     for f in SF2S:
         put(m, f, f"{REMOTE_DIR}/{f.name}")
-    if m.sh(f"test -e {REMOTE_DIR}/{INI.name} || echo none").strip() == "none":
-        put(m, INI, f"{REMOTE_DIR}/{INI.name}")
+    put(m, INI, f"{REMOTE_DIR}/{INI.name}")
     m.sh(f"chmod +x {REMOTE_START}")
     print(f"-> {REMOTE_DIR}/arcsnd, {REMOTE_START}")
     return 0

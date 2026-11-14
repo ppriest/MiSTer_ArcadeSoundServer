@@ -7,7 +7,7 @@
 DIR=/media/fat/games/arcsnd
 LOG=/tmp/arcsnd.log
 running() { pidof arcsnd >/dev/null; }
-launch() { cd "$DIR" || exit 1; chmod +x arcsnd; setsid ./arcsnd </dev/null >/dev/null 2>"$LOG" & }
+launch() { cd "$DIR" || exit 1; [ -e arcsnd.ini ] || cp arcsnd.ini.example arcsnd.ini; chmod +x arcsnd; setsid ./arcsnd </dev/null >/dev/null 2>"$LOG" & }
 halt() { kill $(pidof arcsnd); sleep 1; if running; then echo "arcsnd did not stop"; exit 1; fi; echo "arcsnd stopped"; }
 case "$1" in
 start) running || launch ;;
